@@ -46,7 +46,7 @@
 ```
 
 - Chat 的内置 `relay` 渲染器据 `form: "relay"` + `senderSessionId` 显示「来自会话 …」并渲染正文；唤醒型投递则显示为“收到任务消息”的回合触发行，展开即可看到正文。
-- 插件自带的 Client 半区在接收会话的输入框上方增加一条常驻提示（`conversation.input.dock`）：显示发送方标题、意图、摘要与“打开发送方会话”按钮；被暂停时显示暂停原因与等待对象。
+- 插件自带的 Client 半区把跨会话消息渲染为**对话流内的聊天气泡**（`conversation.chat.node` 自定义节点，复用宿主用户气泡的圆角/配色/字号 token）。气泡下方一行从右到左依次是：**来自会话「标题」（可点击跳转发送方）· 状态（是否继续：如“已暂停 · 等待继续”/“已恢复 · 可以继续”）· 时间 · 复制按钮**。不再占用输入框上方的常驻空间。
 - 正文首行同样由 Host 写入发送方标题与 `ps_` 别名，模型不依赖 UI 也能知道“是谁发来的、该用哪个别名回信”。
 
 ## 安装
@@ -87,7 +87,7 @@ plugin_manager({ action: "install_bundle", target: "<本目录绝对路径>" })
 dsh-parallel-sessions/
 ├── lib/core.js      纯函数：别名、占位符识别、文本截断、归属 source、通知文案、限流
 ├── lib/index.js     Host：4 个工具、投递/恢复、turn/end 自动恢复、系统提示指引
-├── client.js        Client：输入框上方归属/暂停提示条
+├── client.js        Client：对话内跨会话消息气泡（自定义 Chat 节点，底部含发起会话跳转/继续状态/时间/复制）
 ├── cordis.patch.yml 自注册补丁
 ├── locale/*.json    插件管理器显示元数据
 └── test/            node:test 单元测试（纯函数 + mock Host）
@@ -116,7 +116,8 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
   - 发起方会话在 `until=holder-turn-end` 暂停后结束本轮，目标会话随后自动收到
     `intent:'release'` 的「恢复通知」并继续；发起方未调用 `parallel_release`；
   - 目标会话用 `parallel_message` 回信发起方，双向沟通与归属显示均正常。
-- 视觉渲染：无浏览器控制，未做截图级验证；已确认 Client Slot 注册为 active，实际观感请在该会话输入框上方查看。
+- Client 半区：6 个单测（自定义节点渲染器注册、事件归属匹配、节点结构、唤醒消息的 Turn 输入位置、气泡内容/发送方跳转/复制按钮、hold/release“是否继续”状态），共 24 个用例全部通过。
+- 视觉渲染：无浏览器控制，未做截图级验证。可在接收会话的对话流中查看卡片；若更新后仍显示旧样式，请刷新一次页面。
 
 ## 仓库
 
