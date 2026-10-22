@@ -1,6 +1,6 @@
 {
   "name": "dsh-parallel-sessions",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "type": "module",
   "description": "Detect parallel DeepSeek Harness sessions, relay attributed cross-session messages, and pause/resume sessions whose task phases conflict.",

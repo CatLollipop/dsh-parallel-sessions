@@ -409,14 +409,52 @@ window.__ModuleLoader__.load({
           }
         }
         try {
-          if (typeof element.animate === 'function') {
-            element.animate([
-              { outline: '2px solid var(--dsw-alias-brand-primary)', outlineOffset: '2px' },
-              { outline: '2px solid transparent', outlineOffset: '2px' },
-            ], { duration: 1800, easing: 'ease-out' });
+          if (element.style !== undefined && element.style !== null) {
+            element.style.outline = '2px solid var(--dsw-alias-brand-primary)';
+            element.style.outlineOffset = '2px';
+            element.style.borderRadius = '12px';
+            window.setTimeout(function () {
+              try {
+                element.style.outline = '';
+                element.style.outlineOffset = '';
+                element.style.borderRadius = '';
+              } catch (_) {
+                /* highlight cleanup is optional */
+              }
+            }, 6000);
           }
         } catch (_) {
           /* highlight is optional */
+        }
+      }
+
+      /** Small transient notice used when the destination block cannot be found. */
+      function showJumpNotice(message) {
+        try {
+          const notice = document.createElement('div');
+          notice.textContent = message;
+          notice.setAttribute('data-parallel-session-notice', 'jump');
+          notice.style.position = 'fixed';
+          notice.style.top = '64px';
+          notice.style.right = '24px';
+          notice.style.zIndex = '9999';
+          notice.style.padding = '8px 12px';
+          notice.style.borderRadius = '10px';
+          notice.style.border = '0.5px solid var(--dsw-alias-border-l1)';
+          notice.style.background = 'var(--dsw-alias-bg-overlay)';
+          notice.style.color = 'var(--dsw-alias-label-primary)';
+          notice.style.fontSize = '13px';
+          notice.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
+          document.body.appendChild(notice);
+          window.setTimeout(function () {
+            try {
+              notice.remove();
+            } catch (_) {
+              /* notice cleanup is optional */
+            }
+          }, 5000);
+        } catch (_) {
+          /* a missing notice must not break navigation */
         }
       }
 
@@ -437,6 +475,8 @@ window.__ModuleLoader__.load({
             } catch (_) {
               /* timer unavailable: the session still opens */
             }
+          } else {
+            showJumpNotice('跨会话跳转：未找到发送位置（可能不在当前已加载的历史窗口内）');
           }
         }
         try {
