@@ -7,7 +7,7 @@ window.__ModuleLoader__.load({
     const React = require('react');
 
     const name = 'dsh-parallel-sessions-client';
-    const inject = ['slots', 'locale'];
+    const inject = ['slots', 'locale', 'uiConversation', 'uiWorkspace'];
     const NS = 'parallel-sessions';
     const PRODUCER = 'parallel-sessions';
     /** Renderer key contributed to the Chat node slot (never a shipped key). */
@@ -27,6 +27,12 @@ window.__ModuleLoader__.load({
       'card.intent.ack': '已确认',
       'card.copy': '复制',
       'card.copied': '已复制',
+      'card.sent.to': '发给会话「{title}」',
+      'card.sent.status.steer': '已送达',
+      'card.sent.status.followup': '已送达',
+      'card.sent.status.queue': '已排队',
+      'card.sent.status.inject': '已注入上下文',
+      'card.sent.failed': '跨会话消息发送失败',
     };
     const DICT_EN = {
       'card.from': 'From session “{title}”',
@@ -40,6 +46,12 @@ window.__ModuleLoader__.load({
       'card.intent.ack': 'Acknowledged',
       'card.copy': 'Copy',
       'card.copied': 'Copied',
+      'card.sent.to': 'Sent to “{title}”',
+      'card.sent.status.steer': 'Delivered',
+      'card.sent.status.followup': 'Delivered',
+      'card.sent.status.queue': 'Queued',
+      'card.sent.status.inject': 'Injected context',
+      'card.sent.failed': 'Cross-session message failed to send',
     };
 
     const INTENT_KEYS = ['info', 'guide', 'handoff', 'hold', 'release', 'ack'];
@@ -148,6 +160,8 @@ window.__ModuleLoader__.load({
         alias: typeof source.senderAlias === 'string' ? source.senderAlias : '',
         senderSessionId: typeof source.senderSessionId === 'string' ? source.senderSessionId : '',
         summary: typeof source.summary === 'string' ? source.summary : '',
+        display: typeof source.display === 'string' ? source.display : '',
+        senderCallId: typeof source.senderCallId === 'string' ? source.senderCallId : '',
         body: bodyOf(text),
       };
     }
@@ -310,6 +324,95 @@ window.__ModuleLoader__.load({
         return false;
       }
 
+      /** Open the sender session and scroll to the exact send action. */
+      function jumpToSenderMessage(sessionId, callId) {
+        if (typeof sessionId === 'string' && sessionId !== '') openSession(sessionId);
+        if (typeof callId !== 'string' || callId === '') return;
+        // Conversation context key format: `${kind.length}:${kind}${id}`.
+        const targetKey = '9:tool-call' + callId;
+        const selector = '[data-chat-node-key="' + targetKey.replace(/["\\]/g, '\\$&') + '"]';
+        let attempts = 0;
+        function tick() {
+          attempts += 1;
+          try {
+            const element = document.querySelector(selector);
+            if (element !== null && element !== undefined) {
+              try {
+                element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+              } catch (_) {
+                element.scrollIntoView();
+              }
+              try {
+                if (typeof element.animate === 'function') {
+                  element.animate([
+                    { outline: '2px solid var(--dsw-alias-brand-primary)', outlineOffset: '2px' },
+                    { outline: '2px solid transparent', outlineOffset: '2px' },
+                  ], { duration: 1800, easing: 'ease-out' });
+                }
+              } catch (_) {
+                /* highlight is optional */
+              }
+              return;
+            }
+          } catch (_) {
+            return;
+          }
+          if (attempts < 40) {
+            try {
+              window.setTimeout(tick, 150);
+            } catch (_) {
+              /* timer unavailable: the session still opens */
+            }
+          }
+        }
+        try {
+          window.setTimeout(tick, 120);
+        } catch (_) {
+          /* timer unavailable: the session still opens */
+        }
+      }
+
+      /** Right-aligned bubble for a message this session sent to another one. */
+      function SenderBlock(props) {
+        const snapshot = React.useSyncExternalStore(subscribeLocale, localeSnapshot);
+        if (props.phase !== 'result') return null;
+        const block = props.block || {};
+        const meta = block.meta !== null && typeof block.meta === 'object' ? block.meta : null;
+        if (meta === null || meta.acquired !== true) {
+          if (block.isError !== true) return null;
+          return React.createElement('div', { className: 'ps-card-row', 'data-parallel-session-sent': 'failed' },
+            React.createElement('div', { className: 'ps-card-stack' },
+              React.createElement('div', { className: 'ps-card-meta' },
+                React.createElement('span', {
+                  className: 'ps-card-status',
+                  'data-intent': 'hold',
+                }, text(snapshot, 'card.sent.failed', {}, '跨会话消息发送失败', 'Cross-session message failed to send')))));
+        }
+        const title = typeof meta.targetTitle === 'string' && meta.targetTitle !== ''
+          ? meta.targetTitle
+          : (typeof meta.targetAlias === 'string' ? meta.targetAlias : '');
+        const body = typeof meta.message === 'string' ? meta.message : '';
+        const mode = typeof meta.mode === 'string' ? meta.mode : 'steer';
+        const from = text(snapshot, 'card.sent.to', { title: title || '?' },
+          '发给会话「' + (title || '?') + '」', 'Sent to “' + (title || '?') + '”');
+        const status = text(snapshot, 'card.sent.status.' + mode, {},
+          { steer: '已送达', followup: '已送达', queue: '已排队', inject: '已注入上下文' }[mode] || '已送达',
+          { steer: 'Delivered', followup: 'Delivered', queue: 'Queued', inject: 'Injected context' }[mode] || 'Delivered');
+        const time = clockText(block.time, snapshot);
+        return React.createElement('div', {
+          className: 'ps-card-row',
+          'data-parallel-session-sent': mode,
+        },
+          React.createElement('div', { className: 'ps-card-stack' },
+            body !== ''
+              ? React.createElement('div', { className: 'ps-card-bubble' }, body)
+              : null,
+            React.createElement('div', { className: 'ps-card-meta' },
+              React.createElement('span', { className: 'ps-card-recipient', title: from }, from),
+              React.createElement('span', { className: 'ps-card-status', 'data-intent': 'release', title: status }, status),
+              time !== '' ? React.createElement('span', { className: 'ps-card-time' }, time) : null)));
+      }
+
       function ReceiverBubble(props) {
         const snapshot = React.useSyncExternalStore(subscribeLocale, localeSnapshot);
         const data = (props.node && props.node.data) || {};
@@ -329,9 +432,11 @@ window.__ModuleLoader__.load({
         const label = text(snapshot, 'card.intent.' + intent, {},
           ZH_LABELS[intent] || '跨会话消息', EN_LABELS[intent] || 'Cross-session message');
         const from = text(snapshot, 'card.from', { title: title }, '来自会话「' + title + '」', 'From session “' + title + '”');
-        const body = typeof data.body === 'string' && data.body !== ''
-          ? data.body
-          : (typeof data.summary === 'string' ? data.summary : '');
+        const body = typeof data.display === 'string' && data.display !== ''
+          ? data.display
+          : (typeof data.body === 'string' && data.body !== ''
+            ? data.body
+            : (typeof data.summary === 'string' ? data.summary : ''));
         const canOpen = typeof data.senderSessionId === 'string' && data.senderSessionId !== '';
         const time = clockText(data.time, snapshot);
 
@@ -364,7 +469,7 @@ window.__ModuleLoader__.load({
                 disabled: !canOpen,
                 title: from + (canOpen ? ' · ' + text(snapshot, 'card.open', {}, '打开发送方会话', 'Open sender session') : '') + (data.alias !== '' ? ' · ' + data.alias : ''),
                 'aria-label': from,
-                onClick: function () { if (canOpen) openSession(data.senderSessionId); },
+                onClick: function () { if (canOpen) jumpToSenderMessage(data.senderSessionId, data.senderCallId); },
               }, from),
               React.createElement('span', {
                 className: 'ps-card-status',
@@ -403,6 +508,17 @@ window.__ModuleLoader__.load({
       } catch (_) {
         rendererRegistered = false;
       }
+      try {
+        const SenderCard = typeof React.memo === 'function' ? React.memo(SenderBlock) : SenderBlock;
+        ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
+          name: 'tool.call.toolview',
+          key: 'parallel_message',
+          locale: NS,
+        }, SenderCard));
+      } catch (_) {
+        /* sender-side block is optional; the generic tool row remains */
+      }
+
       if (!rendererRegistered) return;
       try {
         const conversation = ctx.uiConversation;

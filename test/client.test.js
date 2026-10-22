@@ -46,6 +46,9 @@ function installDom() {
       created.push(node);
       return node;
     },
+    querySelector() {
+      return null;
+    },
     execCommand() {
       return true;
     },
@@ -150,6 +153,8 @@ function relayEvent(overrides = {}) {
         targetSessionId: 'session-target',
         intent: 'guide',
         summary: '请把新模块的返回结构统一为 Result 包装。',
+        display: '请把新模块的返回结构统一为 Result 包装。',
+        senderCallId: 'call-sender-1',
       },
     },
     ...overrides,
@@ -193,6 +198,12 @@ function textsOf(tree) {
   return out.join(' ');
 }
 
+function rendererOf(host, key) {
+  const entry = host.state.renderers.find((renderer) => renderer.options.key === key);
+  assert.ok(entry, `renderer ${key} should be registered`);
+  return entry.component;
+}
+
 function findElement(tree, predicate) {
   let found = null;
   walk(tree, (node) => {
@@ -207,12 +218,14 @@ test('client registers a compact in-chat bubble renderer and no composer dock', 
   const host = createHost();
   client.apply(host.ctx);
 
-  assert.equal(host.state.renderers.length, 1);
-  assert.equal(host.state.renderers[0].options.name, 'conversation.chat.node');
-  assert.equal(host.state.renderers[0].options.key, 'parallel-session-card');
+  const keys = host.state.renderers.map((renderer) => renderer.options.key);
+  assert.ok(keys.includes('parallel-session-card'), 'receiver bubble renderer');
+  assert.ok(keys.includes('parallel_message'), 'sender-side sent block renderer');
   assert.ok(!host.state.touchedInjectKeys.includes('conversation.input.dock'),
     'the fixed bottom dock must be gone');
   assert.equal(host.state.definitions.length, 1);
+  assert.ok(host.state.touchedInjectKeys.includes('conversation.chat.node'));
+  assert.ok(host.state.touchedInjectKeys.includes('tool.call.toolview'));
 });
 
 test('the definition claims only this plugin relay messages', async () => {
@@ -255,6 +268,8 @@ test('the view node is a bubble-like context card that keeps sender attribution'
   assert.equal(node.data.intent, 'guide');
   assert.equal(node.data.alias, 'ps_abcdefghij');
   assert.equal(node.data.body, '请把新模块的返回结构统一为 Result 包装。');
+  assert.equal(node.data.display, '请把新模块的返回结构统一为 Result 包装。');
+  assert.equal(node.data.senderCallId, 'call-sender-1');
   assert.equal(node.data.waking, false);
 });
 
@@ -321,4 +336,40 @@ test('hold and release messages show whether the session continues', async () =>
     const text = textsOf(component({ node }));
     assert.match(text, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+});
+
+test('the sender side renders a sent block with recipient and content only', async () => {
+  installDom();
+  const client = await loadClient();
+  const host = createHost();
+  client.apply(host.ctx);
+  const SenderBlock = rendererOf(host, 'parallel_message');
+
+  assert.equal(SenderBlock({ phase: 'start', block: {} }), null);
+  const tree = SenderBlock({
+    phase: 'result',
+    block: {
+      time: 1000,
+      isError: false,
+      meta: {
+        acquired: true,
+        targetTitle: '设计评审',
+        targetAlias: 'ps_abcdefghij',
+        intent: '信息同步',
+        mode: 'steer',
+        message: '请把新模块的返回结构统一为 Result 包装。',
+      },
+    },
+  });
+  const text = textsOf(tree);
+  assert.match(text, /发给会话「设计评审」/);
+  assert.match(text, /请把新模块的返回结构统一为 Result 包装/);
+  assert.match(text, /已送达/);
+  assert.doesNotMatch(text, /messageId|MESSAGE|已投递到会话/);
+
+  const failed = SenderBlock({
+    phase: 'result',
+    block: { time: 1000, isError: true, meta: null },
+  });
+  assert.match(textsOf(failed), /跨会话消息发送失败/);
 });

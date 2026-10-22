@@ -59,6 +59,8 @@ test('relay source carries sender attribution fields the Chat relay renderer rea
     targetSessionId: 'session-b',
     intent: 'guide',
     summary: '接口调整',
+    display: '请统一返回结构',
+    senderCallId: 'call-1',
   });
   assert.equal(source.kind, 'agent-message');
   assert.equal(source.form, 'relay');
@@ -66,6 +68,8 @@ test('relay source carries sender attribution fields the Chat relay renderer rea
   assert.equal(source.senderSessionId, 'session-a');
   assert.equal(source.senderTitle, '设计评审');
   assert.equal(source.intent, 'guide');
+  assert.equal(source.display, '请统一返回结构');
+  assert.equal(source.senderCallId, 'call-1');
 });
 
 test('peer message text names the sender and the reply alias', () => {

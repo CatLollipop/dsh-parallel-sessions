@@ -14,7 +14,7 @@
 | 工具 | 作用 |
 |---|---|
 | `parallel_sessions` | 检测同一工作区内并行运行/曾运行过的顶层会话：`ps_` 别名、标题、运行状态、工作目录、暂停关系。用于发现“有并行的任务和会话”。 |
-| `parallel_message` | 向另一个会话投递消息。接收方 Chat 会把消息渲染为跨会话消息卡片（`来自会话 <发送方>`），并在消息正文头部标注发送方标题、`ps_` 别名与意图；发送方获得 `messageId` 回执。`intent=guide` 表示引导对方的设计方向。 |
+| `parallel_message` | 向另一个会话投递消息，**默认 `mode=steer` 直接送达**（运行中在下一步边界立即插入，空闲时立即开一轮），只有显式 `mode=queue` 才等对方当前整轮结束后再投递。接收方对话流内渲染为聊天气泡（正文只含消息内容，底部显示发送方/状态/时间/复制），发送方对话流内渲染为“发给会话「…」”的发送块。`intent=guide` 表示引导对方的设计方向。 |
 | `parallel_hold` | 当本任务会影响另一个会话的阶段时暂停它：真实停止其当前运行回合、清除其待处理队列（数量会上报），并投递带发送方归属的暂停通知。`until=holder-turn-end`（默认）在本轮任务结束时自动恢复对方；`until=manual` 需要显式恢复。 |
 | `parallel_release` | 恢复被本会话暂停的会话，并投递带发起方归属的“继续工作”通知与变更摘要。 |
 
@@ -46,7 +46,7 @@
 ```
 
 - Chat 的内置 `relay` 渲染器据 `form: "relay"` + `senderSessionId` 显示「来自会话 …」并渲染正文；唤醒型投递则显示为“收到任务消息”的回合触发行，展开即可看到正文。
-- 插件自带的 Client 半区把跨会话消息渲染为**对话流内的聊天气泡**（`conversation.chat.node` 自定义节点，复用宿主用户气泡的圆角/配色/字号 token）。气泡下方一行从右到左依次是：**来自会话「标题」（可点击跳转发送方）· 状态（是否继续：如“已暂停 · 等待继续”/“已恢复 · 可以继续”）· 时间 · 复制按钮**。不再占用输入框上方的常驻空间。
+- 插件自带的 Client 半区把跨会话消息渲染为**对话流内的聊天气泡**（`conversation.chat.node` 自定义节点，复用宿主用户气泡的圆角/配色/字号 token），气泡内只显示消息正文（`source.display` 投影，模型可见的协调头部不会进入 UI）。底部一行依次是：**来自会话「标题」（点击打开发送方会话，并滚动/高亮到那次发送消息的工具调用位置）· 状态（是否继续：如“已暂停 · 等待继续”/“已恢复 · 可以继续”）· 时间 · 复制按钮**。发送方一侧通过 `tool.call.toolview` 把 `parallel_message` 的工具卡片替换为“发给会话「标题」+ 正文 + 状态”的独立发送块，不显示 messageId 等技术字段。
 - 正文首行同样由 Host 写入发送方标题与 `ps_` 别名，模型不依赖 UI 也能知道“是谁发来的、该用哪个别名回信”。
 
 ## 安装
@@ -87,7 +87,7 @@ plugin_manager({ action: "install_bundle", target: "<本目录绝对路径>" })
 dsh-parallel-sessions/
 ├── lib/core.js      纯函数：别名、占位符识别、文本截断、归属 source、通知文案、限流
 ├── lib/index.js     Host：4 个工具、投递/恢复、turn/end 自动恢复、系统提示指引
-├── client.js        Client：对话内跨会话消息气泡（自定义 Chat 节点，底部含发起会话跳转/继续状态/时间/复制）
+├── client.js        Client：对话内跨会话气泡（接收方）+ 发送块（发起方），底部含会话跳转/继续状态/时间/复制
 ├── cordis.patch.yml 自注册补丁
 ├── locale/*.json    插件管理器显示元数据
 └── test/            node:test 单元测试（纯函数 + mock Host）
@@ -102,7 +102,7 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
 
 ## 验证记录（DSH 0.2.1-rc.2 / desktop profile）
 
-- 单元测试：24 个用例全部通过（18 个 host/core：别名/占位符/截断/归属 source/通知文案/限流、mock Host 的列表投递/离线恢复/暂停/自动恢复/手动恢复/拒绝路径/限流/系统提示分区；6 个 client：气泡渲染器注册、事件归属匹配、节点结构、唤醒消息 Turn 输入位置、发送方跳转/复制按钮/状态文案）。
+- 单元测试：26 个用例全部通过（18 个 host/core：别名/占位符/截断/归属 source/通知文案/限流、mock Host 的列表投递/离线恢复/暂停/自动恢复/手动恢复/拒绝路径/限流/系统提示分区；8 个 client：气泡与发送块渲染器注册、事件归属匹配、节点结构、唤醒消息 Turn 输入位置、接收方跳转/复制/状态文案、发送块收件人与正文/失败态）。
 - 安装：v0.2.1 重新安装后 `application: applied`，profile 的 bundles 与依赖包含本插件，`parallel_*` 工具进入模型可用工具表；
   在线页面经 Cordis Inspect 确认：`conversation.chat.node` 出现 `dsh-parallel-sessions-client / parallel-session-card`（active），
   `conversation.input.dock` 中不再有本插件（固定底部条已移除）。
@@ -115,8 +115,9 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
   - 发起方会话在 `until=holder-turn-end` 暂停后结束本轮，目标会话随后自动收到
     `intent:'release'` 的「恢复通知」并继续；发起方未调用 `parallel_release`；
   - 目标会话用 `parallel_message` 回信发起方，双向沟通与归属显示均正常。
-- 端到端演示：从临时会话向当前会话投递了一条 `intent:info` 气泡消息（投递模式 steer），当前会话对话流内可直接看到气泡与底部「来自会话「验证气泡渲染的测试消息」· 信息同步 · 时间 · 复制按钮」信息行；临时会话已归档。
-- 视觉渲染：无浏览器控制，未做截图级验证；已确认渲染器在在线页面注册为 active，实际观感请在对话流中查看。若样式未更新，刷新一次页面。
+- 端到端演示：从临时会话向当前会话投递 `intent:info` 消息（默认 steer 直接送达），接收方气泡底部显示「来自会话「…」· 信息同步 · 时间 · 复制」；发送方会话内对应显示“发给会话「…」+ 正文 + 已送达”的发送块。临时会话已归档。
+- 视觉渲染：无浏览器控制，未做截图级验证；已确认接收方气泡与发送块两个渲染器都在在线页面注册为 active，实际观感请在对话流中查看。若样式未更新，刷新一次页面。
+- 关键修复：Client 半区此前未在 `inject` 中声明 `uiConversation`，导致自定义 Conversation Definition 未注册、消息回退为内置渲染（头部信息外露）。本版已补上 `uiConversation` / `uiWorkspace` 注入。
 
 ## 仓库
 

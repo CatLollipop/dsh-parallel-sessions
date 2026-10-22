@@ -161,7 +161,7 @@ function createHost(options = {}) {
       assert.ok(tool, `tool ${name} should be registered`);
       const caller = live.get(callerId);
       assert.ok(caller, `caller ${callerId} should exist`);
-      return tool.execute(args, { agent: caller, signal: undefined });
+      return tool.execute(args, { agent: caller, signal: undefined, callId: 'call-test' });
     },
     emitSessionEvent(sessionId, event) {
       ctx.emit('session/event', { id: sessionId }, event);
@@ -240,9 +240,35 @@ test('parallel_message delivers an attributed relay card and steers a running ta
   assert.equal(message.source.senderTitle, '接口组');
   assert.equal(message.source.senderAlias, makeSessionAlias('session-caller'));
   assert.equal(message.source.intent, 'guide');
+  assert.equal(message.source.display, '请把登录返回结构统一成 Result 包装');
+  assert.equal(message.source.senderCallId, 'call-test');
   assert.match(message.content[0].text, /来自「接口组」/);
   assert.match(message.content[0].text, /设计方向指导/);
   assert.equal(typeof value.messageId, 'string');
+  assert.equal(value.message, '请把登录返回结构统一成 Result 包装');
+  const meta = host.tools.get('parallel_message').output.presentationMeta({}, value);
+  assert.equal(meta.targetTitle, '设计评审');
+  assert.equal(meta.targetAlias, makeSessionAlias('session-peer'));
+  assert.equal(meta.message, value.message);
+  assert.equal(meta.messageId, undefined);
+});
+
+test('parallel_message delivers directly to an idle target by default (no queue)', async () => {
+  const caller = new FakeAgent('session-caller', { status: 'running' });
+  const peer = new FakeAgent('session-peer', { status: 'idle' });
+  const host = createHost({
+    live: [caller, peer],
+    titles: { 'session-caller': '接口组', 'session-peer': '设计评审' },
+  });
+
+  const value = await host.execute('parallel_message', {
+    session_id: makeSessionAlias('session-peer'),
+    message: '请统一返回结构',
+  }, 'session-caller');
+
+  assert.equal(value.accepted, true);
+  assert.equal(value.mode, 'steer', 'default is immediate steer delivery, not followup queueing');
+  assert.deepEqual(peer.calls.map((call) => call.mode), ['steer']);
 });
 
 test('parallel_message refuses self-targets, masked placeholders, and unknown aliases', async () => {
@@ -284,11 +310,12 @@ test('parallel_message cold-delivers by resuming the target session', async () =
 
   assert.equal(value.accepted, true);
   assert.equal(value.resumed, true);
-  assert.equal(value.mode, 'followup');
+  assert.equal(value.mode, 'steer');
   const resumed = host.live.get('session-cold');
   assert.ok(resumed);
   assert.equal(resumed.delivered.length, 1);
   assert.equal(resumed.delivered[0].source.intent, 'info');
+  assert.equal(resumed.delivered[0].source.display, '继续之前的任务');
 });
 
 test('parallel_hold stops the target turn and auto-releases on the holder turn end', async () => {
@@ -316,6 +343,8 @@ test('parallel_hold stops the target turn and auto-releases on the holder turn e
   assert.equal(peer.calls[0].mode, 'cancel');
   assert.equal(peer.calls[1].mode, 'followup');
   assert.equal(peer.delivered[0].source.intent, 'hold');
+  assert.equal(peer.delivered[0].source.display, '我把登录接口返回结构改成 Result 包装 · 联调阶段');
+  assert.equal(peer.delivered[0].source.senderCallId, 'call-test');
   assert.match(peer.delivered[0].content[0].text, /暂停通知/);
 
   const beforeRelease = await host.execute('parallel_sessions', {}, 'session-caller');
