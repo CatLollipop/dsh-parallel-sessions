@@ -96,6 +96,7 @@ window.__ModuleLoader__.load({
       '.ps-card-copy{width:calc(28px + var(--dsh-content-font-delta,0px));height:calc(28px + var(--dsh-content-font-delta,0px));border-radius:var(--dsw-radius-sm,6px);color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:none;display:inline-flex;align-items:center;justify-content:center;padding:6px;flex:none;}',
       '.ps-card-copy:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);}',
       '.ps-card-copy svg{width:15px;height:15px;}',
+      '[data-parallel-jump-target]{outline:2px solid var(--dsw-alias-brand-primary)!important;outline-offset:2px;border-radius:12px;background:color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent);transition:background .18s ease;}',
     ].join('');
 
     function CopyIcon() {
@@ -273,6 +274,15 @@ window.__ModuleLoader__.load({
         }
       }
 
+      // Remove a stale diagnostic badge left by an older HMR generation
+      // (installing a new client module does not reload the page).
+      try {
+        const staleBadge = document.getElementById('ps-jump-debug-badge');
+        if (staleBadge !== null && typeof staleBadge.remove === 'function') staleBadge.remove();
+      } catch (_) {
+        /* nothing to clean */
+      }
+
       // The card reuses the shipped user-bubble tokens; styles live in one
       // plugin-owned tag removed with the plugin.
       try {
@@ -396,8 +406,8 @@ window.__ModuleLoader__.load({
         }
       }
 
-      /** Scroll to the sent block and flash it. */
-      function revealSendAnchor(element) {
+      /** Scroll to the sent block and keep a visible highlight on it. */
+      function revealSendAnchor(element, callId) {
         prepareAnchor(element);
         try {
           element.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -409,20 +419,19 @@ window.__ModuleLoader__.load({
           }
         }
         try {
-          if (element.style !== undefined && element.style !== null) {
-            element.style.outline = '2px solid var(--dsw-alias-brand-primary)';
-            element.style.outlineOffset = '2px';
-            element.style.borderRadius = '12px';
-            window.setTimeout(function () {
-              try {
-                element.style.outline = '';
-                element.style.outlineOffset = '';
-                element.style.borderRadius = '';
-              } catch (_) {
-                /* highlight cleanup is optional */
-              }
-            }, 6000);
-          }
+          const until = Date.now() + 8000;
+          const mark = function () {
+            const current = findSendAnchor(callId);
+            if (current !== null && typeof current.setAttribute === 'function') {
+              current.setAttribute('data-parallel-jump-target', '');
+            }
+            if (Date.now() < until) {
+              window.setTimeout(mark, 250);
+            } else if (current !== null && typeof current.removeAttribute === 'function') {
+              current.removeAttribute('data-parallel-jump-target');
+            }
+          };
+          mark();
         } catch (_) {
           /* highlight is optional */
         }
@@ -466,7 +475,7 @@ window.__ModuleLoader__.load({
           attempts += 1;
           const element = findSendAnchor(callId);
           if (element !== null) {
-            revealSendAnchor(element);
+            revealSendAnchor(element, callId);
             return;
           }
           if (attempts < 140) {
@@ -488,7 +497,11 @@ window.__ModuleLoader__.load({
 
       /** Open the sender session and scroll to the exact send block. */
       function jumpToSenderMessage(sessionId, callId) {
-        if (typeof sessionId === 'string' && sessionId !== '') openSession(sessionId);
+        try {
+          if (typeof sessionId === 'string' && sessionId !== '') openSession(sessionId);
+        } catch (_) {
+          /* the deep link still tries to locate the block below */
+        }
         scrollToSendAnchor(callId);
       }
 
