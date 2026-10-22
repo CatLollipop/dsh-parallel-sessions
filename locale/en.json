@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Parallel Session Orchestrator",
+    "description": "Detects parallel sessions in the same workspace, relays cross-session messages that show which session started them, guides another session's design direction, and pauses/resumes sessions whose task phases conflict."
+  }
+}

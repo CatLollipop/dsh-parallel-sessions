@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Parallel Session Orchestrator">
+  <defs>
+    <linearGradient id="psBackground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4a63e7"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="url(#psBackground)"/>
+  <path d="M15 18.5h20a5 5 0 0 1 5 5v9a5 5 0 0 1-5 5H23.5L16.6 42a1.2 1.2 0 0 1-1.9-1v-3.1A5 5 0 0 1 10 33V23.5a5 5 0 0 1 5-5Z" fill="#ffffff" fill-opacity="0.94"/>
+  <path d="M29.5 28.5h19.4a4.6 4.6 0 0 1 4.6 4.6v7.4a4.6 4.6 0 0 1-4.6 4.6h-2.3V49a1.1 1.1 0 0 1-1.8.86l-4.8-3.86h-10.5a4.6 4.6 0 0 1-4.6-4.6v-7.4a4.6 4.6 0 0 1 4.6-4.6Z" fill="#ffffff" fill-opacity="0.58" stroke="#ffffff" stroke-opacity="0.9" stroke-width="1.2"/>
+  <circle cx="39" cy="36.8" r="1.7" fill="#4a63e7"/>
+  <circle cx="45" cy="36.8" r="1.7" fill="#4a63e7"/>
+  <rect x="22.5" y="43" width="4" height="10" rx="1.6" fill="#ffffff"/>
+  <rect x="29.5" y="43" width="4" height="10" rx="1.6" fill="#ffffff"/>
+</svg>

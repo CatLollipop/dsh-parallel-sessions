@@ -1,0 +1,25 @@
+# Mount the dsh-parallel-sessions bundle into the DSH profile.
+# The Host row registers the parallel_* tools; the package's `dsh.client`
+# section supplies the composer dock entry that names the sending session.
+- insert:
+    - id: parallel-sessions
+      name: 'dsh-parallel-sessions'
+      # Required services: fail to load in profiles that lack any of them.
+      inject:
+        - tools
+        - agents
+        - sessionQuery
+      config:
+        # Register the concise coordination guidance when parallel sessions exist.
+        guide: true
+        # Release `until: holder-turn-end` holds when the holder's turn ends.
+        autoReleaseOnTurnEnd: true
+        # Cancel a running target turn when it is paused (real stop, not a message).
+        holdCancel: true
+        # Maximum recorded holds per process.
+        maxHolds: 8
+        # Per-pair delivery window (10 messages / 60 s).
+        pairMessageLimit: 10
+        pairWindowMs: 60000
+        # Maximum UTF-8 bytes of one relayed message body.
+        maxTextBytes: 32768
