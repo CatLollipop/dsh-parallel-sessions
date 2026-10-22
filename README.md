@@ -116,7 +116,8 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
     `intent:'release'` 的「恢复通知」并继续；发起方未调用 `parallel_release`；
   - 目标会话用 `parallel_message` 回信发起方，双向沟通与归属显示均正常。
 - 端到端演示：从临时会话向当前会话投递 `intent:info` 消息（默认 steer 直接送达），接收方气泡底部显示「来自会话「…」· 信息同步 · 时间 · 复制」；发送方会话内对应显示“发给会话「…」+ 正文 + 已送达”的发送块。临时会话已归档。
-- 视觉渲染：无浏览器控制，未做截图级验证；已确认接收方气泡与发送块两个渲染器都在在线页面注册为 active，实际观感请在对话流中查看。若样式未更新，刷新一次页面。
+- v0.3 在线验证：在线页面中接收方气泡 `parallel-session-card` 与发送方发送块 `parallel_message`（`tool.call.toolview`）两个渲染器均为 active；用临时会话做了双向演示：接收方会话的对话流出现仅含正文的气泡，发送方会话的 `parallel_message` 工具卡片被替换为“发给会话「…」+ 正文 + 已送达”的发送块；临时会话已归档。
+- 视觉渲染：无浏览器控制，未做截图级验证，实际观感请在对话流中查看。若样式未更新，刷新一次页面。
 - 关键修复：Client 半区此前未在 `inject` 中声明 `uiConversation`，导致自定义 Conversation Definition 未注册、消息回退为内置渲染（头部信息外露）。本版已补上 `uiConversation` / `uiWorkspace` 注入。
 
 ## 仓库
