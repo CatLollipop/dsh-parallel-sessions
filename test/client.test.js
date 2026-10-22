@@ -49,6 +49,9 @@ function installDom() {
     querySelector() {
       return null;
     },
+    querySelectorAll() {
+      return [];
+    },
     execCommand() {
       return true;
     },
@@ -58,11 +61,11 @@ function installDom() {
 
 async function loadClient() {
   let captured;
-  globalThis.window = {
-    __ModuleLoader__: {
-      load(info) {
-        captured = info;
-      },
+  globalThis.window = globalThis.window || {};
+  globalThis.window.setTimeout = globalThis.window.setTimeout || function () { return 0; };
+  globalThis.window.__ModuleLoader__ = {
+    load(info) {
+      captured = info;
     },
   };
   await import('../client.js?client-test=' + Math.random().toString(36).slice(2));
@@ -409,6 +412,33 @@ test('clicking an archived sender unarchives it before opening the session', asy
   assert.deepEqual(host.state.opened, ['session-sender']);
 });
 
+test('clicking the sender opens the session and scrolls to the sent-block anchor', async () => {
+  installDom();
+  const scrolled = [];
+  const anchor = {
+    scrollIntoView(options) { scrolled.push(options); },
+    animate() {},
+    getAttribute() { return null; },
+    parentElement: null,
+    querySelector() { return null; },
+  };
+  document.querySelector = (selector) => (String(selector).indexOf('data-parallel-call-id') !== -1 ? anchor : null);
+  window.setTimeout = (callback) => { callback(); return 0; };
+
+  const client = await loadClient();
+  const host = createHost();
+  client.apply(host.ctx);
+  const definition = host.state.definitions[0];
+  const node = definition.buildViewNode(contextOf(definition, relayEvent(), { previous: () => undefined }));
+  const component = host.state.renderers.find((renderer) => renderer.options.key === 'parallel-session-card').component;
+  const view = component({ node });
+  const sender = findElement(view, (element) => element.props && element.props.className === 'ps-card-sender');
+  sender.props.onClick();
+  assert.deepEqual(host.state.opened, ['session-sender']);
+  assert.equal(scrolled.length, 1, 'the destination sent block should be scrolled into view');
+  assert.equal(scrolled[0].block, 'center');
+});
+
 test('the sender side renders a sent block with recipient and content only', async () => {
   installDom();
   const client = await loadClient();
@@ -419,6 +449,7 @@ test('the sender side renders a sent block with recipient and content only', asy
   assert.equal(SenderBlock({ phase: 'start', block: {} }), null);
   const tree = SenderBlock({
     phase: 'result',
+    callId: 'call-sender-1',
     block: {
       time: 1000,
       isError: false,
@@ -435,6 +466,7 @@ test('the sender side renders a sent block with recipient and content only', asy
   const row = findElement(tree, (element) => element.props && element.props.className === 'ps-card-row');
   assert.ok(row, 'sent block row should exist');
   assert.equal(row.props['data-direction'], 'outgoing', 'sent messages render left');
+  assert.equal(row.props['data-parallel-call-id'], 'call-sender-1', 'sent block carries its deep-link anchor');
   const text = textsOf(tree);
   assert.match(text, /发给会话「设计评审」/);
   assert.match(text, /请把新模块的返回结构统一为 Result 包装/);

@@ -47,7 +47,7 @@
 
 - Chat 的内置 `relay` 渲染器据 `form: "relay"` + `senderSessionId` 显示「来自会话 …」并渲染正文；唤醒型投递则显示为“收到任务消息”的回合触发行，展开即可看到正文。
 - 点击「来自会话」会打开对应会话的历史窗口并定位到那次发送调用；如果发送方会话已归档，会先自动取消归档再打开（避免跳到空白新会话）。
-- 插件自带的 Client 半区把跨会话消息渲染为**对话流内的聊天气泡**（`conversation.chat.node` 自定义节点，复用宿主用户气泡的圆角/配色/字号 token），我发出的发送块靠左、我收到的接收气泡靠右。气泡内只显示消息正文（`source.display` 投影，模型可见的协调头部不会进入 UI）。底部一行依次是：**来自会话「标题」（点击打开发送方会话，并滚动/高亮到那次发送消息的工具调用位置）· 状态（是否继续：如“已暂停 · 等待继续”/“已恢复 · 可以继续”）· 时间 · 复制按钮**。发送方一侧通过 `tool.call.toolview` 把 `parallel_message` 的工具卡片替换为“发给会话「标题」+ 正文 + 状态”的独立发送块，不显示 messageId 等技术字段。
+- 插件自带的 Client 半区把跨会话消息渲染为**对话流内的聊天气泡**（`conversation.chat.node` 自定义节点，复用宿主用户气泡的圆角/配色/字号 token），我发出的发送块靠左、我收到的接收气泡靠右。气泡内只显示消息正文（`source.display` 投影，模型可见的协调头部不会进入 UI）。底部一行依次是：**来自会话「标题」（点击打开发送方会话，并滚动/高亮到本插件渲染的发送块；优先使用发送块自身的 `data-parallel-call-id` 锚点，轮询等待渲染、自动展开折叠的回合过程，最长约 20 秒）· 状态（是否继续：如“已暂停 · 等待继续”/“已恢复 · 可以继续”）· 时间 · 复制按钮**。发送方一侧通过 `tool.call.toolview` 把 `parallel_message` 的工具卡片替换为“发给会话「标题」+ 正文 + 状态”的独立发送块，不显示 messageId 等技术字段。
 - 正文首行同样由 Host 写入发送方标题与 `ps_` 别名，模型不依赖 UI 也能知道“是谁发来的、该用哪个别名回信”。
 
 ## 界面截图（实际运行效果）
@@ -116,7 +116,7 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
 
 ## 验证记录（DSH 0.2.1-rc.2 / desktop profile）
 
-- 单元测试：28 个用例全部通过（18 个 host/core + 10 个 client：在原有基础上新增「槽位回调延迟时 Definition 仍注册」与「归档发送方先取消归档再打开」回归用例）。
+- 单元测试：29 个用例全部通过（18 个 host/core + 10 个 client：在原有基础上新增「槽位回调延迟时 Definition 仍注册」与「归档发送方先取消归档再打开」回归用例）。
 - 安装：v0.2.1 重新安装后 `application: applied`，profile 的 bundles 与依赖包含本插件，`parallel_*` 工具进入模型可用工具表；
   在线页面经 Cordis Inspect 确认：`conversation.chat.node` 出现 `dsh-parallel-sessions-client / parallel-session-card`（active），
   `conversation.input.dock` 中不再有本插件（固定底部条已移除）。
@@ -134,7 +134,8 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
 - 视觉渲染：已用真实运行界面截图验证并保存到 `docs/screenshots/`（见上方「界面截图」章节）；截图取自本机 GUI，接收气泡靠右、发送块靠左。
 - 关键修复 1（v0.3.0）：Client 半区此前未在 `inject` 中声明 `uiConversation`，导致自定义 Conversation Definition 未注册、消息回退为内置渲染（头部信息外露）。已补上 `uiConversation` / `uiWorkspace` 注入。
 - 关键修复 2（v0.3.3）：冷启动时 Chat 节点槽位回调可能晚于 client apply 执行，原先用该回调的同步结果决定是否注册消息 Definition，导致重启后气泡不出现；现改为独立注册 Definition，并加了回归测试。
-- 关键修复 3（v0.3.4）：点击归属链接打开已归档的发送方会话会被宿主拒绝而落到空白视图；现在先自动取消归档，再打开历史并定位到发送动作。
+- 关键修复 3（v0.3.4）：点击归属链接打开已归档的发送方会话会被宿主拒绝而落到空白视图；现在先自动取消归档，再打开历史。
+- 关键修复 4（v0.3.5）：跳转定位原先依赖计算 Chat 工具节点的 context key，容易受节点位置/折叠/加载窗口影响；现在发送块自身带 `data-parallel-call-id` 锚点，点击后按锚点轮询定位并高亮，找不到时再回退到节点 key 扫描。
 
 ## 仓库
 

@@ -353,40 +353,85 @@ window.__ModuleLoader__.load({
         jumpToSenderMessage(sessionId, callId);
       }
 
-      /** Open the sender session and scroll to the exact send action. */
-      function jumpToSenderMessage(sessionId, callId) {
-        if (typeof sessionId === 'string' && sessionId !== '') openSession(sessionId);
+      /** Find the sender-side sent block for one tool call id. */
+      function findSendAnchor(callId) {
+        const escaped = String(callId).replace(/["\\]/g, '\\$&');
+        try {
+          const own = document.querySelector('[data-parallel-call-id="' + escaped + '"]');
+          if (own !== null && own !== undefined) return own;
+        } catch (_) {
+          /* fall through to the generic node-key scan */
+        }
+        try {
+          const nodes = document.querySelectorAll('[data-chat-node-key]');
+          for (let index = 0; index < nodes.length; index += 1) {
+            const key = nodes[index] && typeof nodes[index].getAttribute === 'function'
+              ? nodes[index].getAttribute('data-chat-node-key')
+              : '';
+            if (typeof key === 'string' && key.indexOf(String(callId)) !== -1) return nodes[index];
+          }
+        } catch (_) {
+          /* caller keeps retrying */
+        }
+        return null;
+      }
+
+      /** Best-effort: reveal a collapsed process group that hides the anchor. */
+      function prepareAnchor(element) {
+        try {
+          let node = element;
+          while (node !== null && node !== document.body) {
+            if (typeof node.getAttribute === 'function') {
+              const kind = node.getAttribute('data-chat-flow-kind');
+              if (kind === 'turn-process' && typeof node.querySelector === 'function') {
+                const toggle = node.querySelector('button[aria-expanded="false"]');
+                if (toggle !== null && typeof toggle.click === 'function') toggle.click();
+                break;
+              }
+            }
+            node = node.parentElement;
+          }
+        } catch (_) {
+          /* expanding is optional */
+        }
+      }
+
+      /** Scroll to the sent block and flash it. */
+      function revealSendAnchor(element) {
+        prepareAnchor(element);
+        try {
+          element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } catch (_) {
+          try {
+            element.scrollIntoView();
+          } catch (_) {
+            /* scrolling is best-effort */
+          }
+        }
+        try {
+          if (typeof element.animate === 'function') {
+            element.animate([
+              { outline: '2px solid var(--dsw-alias-brand-primary)', outlineOffset: '2px' },
+              { outline: '2px solid transparent', outlineOffset: '2px' },
+            ], { duration: 1800, easing: 'ease-out' });
+          }
+        } catch (_) {
+          /* highlight is optional */
+        }
+      }
+
+      /** Poll until the sent block is rendered in the opened session, then scroll. */
+      function scrollToSendAnchor(callId) {
         if (typeof callId !== 'string' || callId === '') return;
-        // Conversation context key format: `${kind.length}:${kind}${id}`.
-        const targetKey = '9:tool-call' + callId;
-        const selector = '[data-chat-node-key="' + targetKey.replace(/["\\]/g, '\\$&') + '"]';
         let attempts = 0;
         function tick() {
           attempts += 1;
-          try {
-            const element = document.querySelector(selector);
-            if (element !== null && element !== undefined) {
-              try {
-                element.scrollIntoView({ block: 'center', behavior: 'smooth' });
-              } catch (_) {
-                element.scrollIntoView();
-              }
-              try {
-                if (typeof element.animate === 'function') {
-                  element.animate([
-                    { outline: '2px solid var(--dsw-alias-brand-primary)', outlineOffset: '2px' },
-                    { outline: '2px solid transparent', outlineOffset: '2px' },
-                  ], { duration: 1800, easing: 'ease-out' });
-                }
-              } catch (_) {
-                /* highlight is optional */
-              }
-              return;
-            }
-          } catch (_) {
+          const element = findSendAnchor(callId);
+          if (element !== null) {
+            revealSendAnchor(element);
             return;
           }
-          if (attempts < 40) {
+          if (attempts < 140) {
             try {
               window.setTimeout(tick, 150);
             } catch (_) {
@@ -401,6 +446,12 @@ window.__ModuleLoader__.load({
         }
       }
 
+      /** Open the sender session and scroll to the exact send block. */
+      function jumpToSenderMessage(sessionId, callId) {
+        if (typeof sessionId === 'string' && sessionId !== '') openSession(sessionId);
+        scrollToSendAnchor(callId);
+      }
+
       /** Left-aligned bubble for a message this session sent to another one. */
       function SenderBlock(props) {
         const snapshot = React.useSyncExternalStore(subscribeLocale, localeSnapshot);
@@ -409,7 +460,12 @@ window.__ModuleLoader__.load({
         const meta = block.meta !== null && typeof block.meta === 'object' ? block.meta : null;
         if (meta === null || meta.acquired !== true) {
           if (block.isError !== true) return null;
-          return React.createElement('div', { className: 'ps-card-row', 'data-direction': 'outgoing', 'data-parallel-session-sent': 'failed' },
+          return React.createElement('div', {
+            className: 'ps-card-row',
+            'data-direction': 'outgoing',
+            'data-parallel-session-sent': 'failed',
+            'data-parallel-call-id': typeof props.callId === 'string' && props.callId !== '' ? props.callId : undefined,
+          },
             React.createElement('div', { className: 'ps-card-stack' },
               React.createElement('div', { className: 'ps-card-meta' },
                 React.createElement('span', {
@@ -432,6 +488,7 @@ window.__ModuleLoader__.load({
           className: 'ps-card-row',
           'data-direction': 'outgoing',
           'data-parallel-session-sent': mode,
+          'data-parallel-call-id': typeof props.callId === 'string' && props.callId !== '' ? props.callId : undefined,
         },
           React.createElement('div', { className: 'ps-card-stack' },
             body !== ''
