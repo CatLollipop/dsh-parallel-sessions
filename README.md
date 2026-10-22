@@ -102,11 +102,10 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
 
 ## 验证记录（DSH 0.2.1-rc.2 / desktop profile）
 
-- 单元测试：18 个用例全部通过（别名/占位符/截断/归属 source/通知文案/限流 + mock Host 的列表、投递、
-  离线恢复、暂停、自动恢复、手动恢复、非发起方拒绝恢复、重复暂停拒绝、消息洪泛限流、系统提示分区）。
-- 安装：`plugin_manager install_bundle` 返回 `application: applied`，profile 的 bundles 与依赖已包含本插件，
-  `parallel_*` 工具进入模型可用工具表；Client Slot `conversation.input.dock` 出现
-  `dsh-parallel-sessions-client / parallel-sessions`（active）。
+- 单元测试：24 个用例全部通过（18 个 host/core：别名/占位符/截断/归属 source/通知文案/限流、mock Host 的列表投递/离线恢复/暂停/自动恢复/手动恢复/拒绝路径/限流/系统提示分区；6 个 client：气泡渲染器注册、事件归属匹配、节点结构、唤醒消息 Turn 输入位置、发送方跳转/复制按钮/状态文案）。
+- 安装：v0.2.1 重新安装后 `application: applied`，profile 的 bundles 与依赖包含本插件，`parallel_*` 工具进入模型可用工具表；
+  在线页面经 Cordis Inspect 确认：`conversation.chat.node` 出现 `dsh-parallel-sessions-client / parallel-session-card`（active），
+  `conversation.input.dock` 中不再有本插件（固定底部条已移除）。
 - 真实双会话自测：
   - 目标会话运行 `sleep 90` 时被 `parallel_hold` 暂停，宿主日志出现
     `turn/end {reason:{kind:'aborted', reason:{kind:'user'}}}`，证明是真实中止而不是只发消息；
@@ -116,8 +115,8 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
   - 发起方会话在 `until=holder-turn-end` 暂停后结束本轮，目标会话随后自动收到
     `intent:'release'` 的「恢复通知」并继续；发起方未调用 `parallel_release`；
   - 目标会话用 `parallel_message` 回信发起方，双向沟通与归属显示均正常。
-- Client 半区：6 个单测（自定义节点渲染器注册、事件归属匹配、节点结构、唤醒消息的 Turn 输入位置、气泡内容/发送方跳转/复制按钮、hold/release“是否继续”状态），共 24 个用例全部通过。
-- 视觉渲染：无浏览器控制，未做截图级验证。可在接收会话的对话流中查看卡片；若更新后仍显示旧样式，请刷新一次页面。
+- 端到端演示：从临时会话向当前会话投递了一条 `intent:info` 气泡消息（投递模式 steer），当前会话对话流内可直接看到气泡与底部「来自会话「验证气泡渲染的测试消息」· 信息同步 · 时间 · 复制按钮」信息行；临时会话已归档。
+- 视觉渲染：无浏览器控制，未做截图级验证；已确认渲染器在在线页面注册为 active，实际观感请在对话流中查看。若样式未更新，刷新一次页面。
 
 ## 仓库
 
