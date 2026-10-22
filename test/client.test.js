@@ -302,7 +302,7 @@ test('the bubble renders body, sender link, continue status, time and copy butto
 
   const row = findElement(tree, (element) => element.props && element.props.className === 'ps-card-row');
   assert.ok(row, 'bubble row should exist');
-  assert.equal(row.props['data-direction'], 'incoming', 'received messages align left');
+  assert.equal(row.props['data-direction'], 'incoming', 'received messages render right');
   const text = textsOf(tree);
   assert.match(text, /请把新模块的返回结构统一为 Result 包装/, 'bubble body');
   assert.match(text, /来自会话「设计评审」/, 'sender attribution');
@@ -366,7 +366,7 @@ test('the sender side renders a sent block with recipient and content only', asy
   });
   const row = findElement(tree, (element) => element.props && element.props.className === 'ps-card-row');
   assert.ok(row, 'sent block row should exist');
-  assert.equal(row.props['data-direction'], 'outgoing', 'sent messages align right');
+  assert.equal(row.props['data-direction'], 'outgoing', 'sent messages render left');
   const text = textsOf(tree);
   assert.match(text, /发给会话「设计评审」/);
   assert.match(text, /请把新模块的返回结构统一为 Result 包装/);
