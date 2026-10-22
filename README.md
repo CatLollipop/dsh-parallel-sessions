@@ -62,6 +62,10 @@
 
 ![接收方气泡（右侧）](docs/screenshots/receiver-bubble.png)
 
+点击「来自会话」跳转后，目标发送块会被高亮（实测截图，2026-10-23）：
+
+![点击归属链接后高亮定位到发送块](docs/screenshots/jump-highlight.png)
+
 ## 安装
 
 把本目录作为本地 bundle 安装进当前 profile：
@@ -136,6 +140,7 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
 - 关键修复 2（v0.3.3）：冷启动时 Chat 节点槽位回调可能晚于 client apply 执行，原先用该回调的同步结果决定是否注册消息 Definition，导致重启后气泡不出现；现改为独立注册 Definition，并加了回归测试。
 - 关键修复 3（v0.3.4）：点击归属链接打开已归档的发送方会话会被宿主拒绝而落到空白视图；现在先自动取消归档，再打开历史。
 - 关键修复 4（v0.3.5）：跳转定位原先依赖计算 Chat 工具节点的 context key，容易受节点位置/折叠/加载窗口影响；现在发送块自身带 `data-parallel-call-id` 锚点，点击后按锚点轮询定位并高亮，找不到时再回退到节点 key 扫描。
+- 关键修复 5（v0.3.8/0.3.9）：高亮改为「重新应用 data 属性 + CSS 规则」，避免历史加载触发 React 重渲染后高亮丢失；找不到目标时弹出提示；并清理旧版本遗留的调试标记。实测（macOS 屏幕录制 + CGEvent 自动点击）：点击接收方气泡的归属链接后成功打开发送方会话，锚点在第一次轮询即命中，发送块被高亮。
 
 ## 仓库
 
