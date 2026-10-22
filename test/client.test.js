@@ -228,6 +228,45 @@ test('client registers a compact in-chat bubble renderer and no composer dock', 
   assert.ok(host.state.touchedInjectKeys.includes('tool.call.toolview'));
 });
 
+test('the conversation definition registers even when the chat slot callback is deferred', async () => {
+  installDom();
+  const client = await loadClient();
+  const state = { definitions: [], touched: [] };
+  const deferredCtx = {
+    effect(callback) {
+      callback();
+      return () => {};
+    },
+    locale: {
+      register() { return () => {}; },
+      subscribe() { return () => {}; },
+      getSnapshot() { return { active: 'zh', revision: 1 }; },
+      bind() { return (key) => key; },
+    },
+    slots: {
+      inject(key) {
+        state.touched.push(key);
+        return () => {};
+      },
+      register() {
+        return () => {};
+      },
+    },
+    uiConversation: {
+      events: {
+        register(definition) {
+          state.definitions.push(definition);
+          return () => {};
+        },
+      },
+    },
+    uiWorkspace: { openSession() {} },
+  };
+  client.apply(deferredCtx);
+  assert.equal(state.definitions.length, 1,
+    'the message Definition must not wait for the Chat node slot callback');
+});
+
 test('the definition claims only this plugin relay messages', async () => {
   installDom();
   const client = await loadClient();

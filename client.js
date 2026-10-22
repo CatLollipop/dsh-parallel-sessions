@@ -500,7 +500,7 @@ window.__ModuleLoader__.load({
       // live. If that registration does not succeed, do not claim the event, so
       // the shipped relay row remains the visible fallback.
       const Card = typeof React.memo === 'function' ? React.memo(ReceiverBubble) : ReceiverBubble;
-      let rendererRegistered = false;
+      let rendererRegistered = false; // debug only: slot callback observed
       try {
         ctx.slots.inject('conversation.chat.node', () => {
           const disposer = ctx.slots.register({
@@ -525,16 +525,21 @@ window.__ModuleLoader__.load({
         /* sender-side block is optional; the generic tool row remains */
       }
 
-      if (!rendererRegistered) return;
+      // Register the Definition independently of when the Chat node slot
+      // becomes available: on a cold page boot the slot injection callback may
+      // run later than this apply(), and claiming must not depend on that order.
       try {
         const conversation = ctx.uiConversation;
-        if (conversation === undefined || conversation === null
-          || conversation.events === undefined || typeof conversation.events.register !== 'function') {
-          return;
+        if (conversation !== undefined && conversation !== null
+          && conversation.events !== undefined && typeof conversation.events.register === 'function') {
+          conversation.events.register(buildDefinition());
         }
-        conversation.events.register(buildDefinition());
-      } catch (_) {
-        /* keep the shipped relay rows when the custom definition cannot register */
+      } catch (error) {
+        try {
+          console.error('[dsh-parallel-sessions] conversation definition registration failed:', error);
+        } catch (_) {
+          /* keep the shipped relay rows when the custom definition cannot register */
+        }
       }
     }
 
