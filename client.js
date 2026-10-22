@@ -74,8 +74,12 @@ window.__ModuleLoader__.load({
     };
 
     const CSS = [
-      '.ps-card-row{display:flex;flex-direction:column;align-items:flex-end;gap:6px;width:100%;}',
-      '.ps-card-stack{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:0;max-width:min(calc(var(--dsh-chat-content-width,748px) * .702),82%);}',
+      '.ps-card-row{display:flex;flex-direction:column;gap:6px;width:100%;}',
+      '.ps-card-row[data-direction="incoming"]{align-items:flex-start;}',
+      '.ps-card-row[data-direction="outgoing"]{align-items:flex-end;}',
+      '.ps-card-stack{display:flex;flex-direction:column;gap:8px;min-width:0;max-width:min(calc(var(--dsh-chat-content-width,748px) * .702),82%);}',
+      '.ps-card-row[data-direction="incoming"] .ps-card-stack{align-items:flex-start;}',
+      '.ps-card-row[data-direction="outgoing"] .ps-card-stack{align-items:flex-end;}',
       '.ps-card-bubble{background:var(--dsw-specific-bubble,var(--dsw-alias-bg-layer-2));border-radius:var(--dsw-radius-xl,16px);max-width:100%;font-size:var(--dsh-content-font-size,14px);line-height:calc(22px + var(--dsh-content-font-delta,0px));color:var(--dsw-alias-label-primary);white-space:pre-wrap;word-break:break-word;padding:10px 16px;}',
       '.ps-card-meta{display:flex;align-items:center;gap:8px;height:calc(28px + var(--dsh-content-font-delta,0px));color:var(--dsw-alias-label-tertiary);font-size:var(--dsh-content-font-size-secondary,13px);line-height:calc(24px + var(--dsh-content-font-delta,0px));max-width:100%;min-width:0;}',
       '.ps-card-sender{appearance:none;border:0;background:transparent;color:var(--dsw-alias-brand-primary);font:inherit;padding:0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(320px,46vw);text-align:left;}',
@@ -380,7 +384,7 @@ window.__ModuleLoader__.load({
         const meta = block.meta !== null && typeof block.meta === 'object' ? block.meta : null;
         if (meta === null || meta.acquired !== true) {
           if (block.isError !== true) return null;
-          return React.createElement('div', { className: 'ps-card-row', 'data-parallel-session-sent': 'failed' },
+          return React.createElement('div', { className: 'ps-card-row', 'data-direction': 'outgoing', 'data-parallel-session-sent': 'failed' },
             React.createElement('div', { className: 'ps-card-stack' },
               React.createElement('div', { className: 'ps-card-meta' },
                 React.createElement('span', {
@@ -401,6 +405,7 @@ window.__ModuleLoader__.load({
         const time = clockText(block.time, snapshot);
         return React.createElement('div', {
           className: 'ps-card-row',
+          'data-direction': 'outgoing',
           'data-parallel-session-sent': mode,
         },
           React.createElement('div', { className: 'ps-card-stack' },
@@ -455,6 +460,7 @@ window.__ModuleLoader__.load({
 
         return React.createElement('div', {
           className: 'ps-card-row',
+          'data-direction': 'incoming',
           'data-parallel-session-card': intent,
           'data-chat-flow-kind': 'parallel-session',
         },
