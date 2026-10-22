@@ -467,10 +467,52 @@ window.__ModuleLoader__.load({
         }
       }
 
+      /** Find the visible conversation scroll container of the opened session. */
+      function findConversationScroller() {
+        try {
+          const nodes = document.querySelectorAll('[data-conversation-scroll]');
+          let fallback = null;
+          for (let index = 0; index < nodes.length; index += 1) {
+            const node = nodes[index];
+            if (node === null || node === undefined || typeof node.getBoundingClientRect !== 'function') continue;
+            const rect = node.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) continue;
+            const visible = rect.bottom > 0 && rect.top < (window.innerHeight || 800);
+            if (visible) return node;
+            if (fallback === null) fallback = node;
+          }
+          return fallback;
+        } catch (_) {
+          return null;
+        }
+      }
+
+      /** Locate the Chat "load earlier" control inside the conversation scroller. */
+      function findLoadOlderControl(scroller) {
+        try {
+          const buttons = scroller.querySelectorAll('button');
+          for (let index = 0; index < buttons.length; index += 1) {
+            const button = buttons[index];
+            const label = typeof button.textContent === 'string' ? button.textContent.trim() : '';
+            if (/加载更早|Load earlier/i.test(label) || /载入历史|Loading history/i.test(label)) return button;
+          }
+          const container = scroller.querySelector('[class*="_older"]');
+          if (container !== null && container !== undefined && typeof container.querySelector === 'function') {
+            const button = container.querySelector('button');
+            if (button !== null && button !== undefined) return button;
+          }
+        } catch (_) {
+          /* fall through */
+        }
+        return null;
+      }
+
       /** Poll until the sent block is rendered in the opened session, then scroll. */
       function scrollToSendAnchor(callId) {
         if (typeof callId !== 'string' || callId === '') return;
         let attempts = 0;
+        let pages = 0;
+        let stalled = 0;
         function tick() {
           attempts += 1;
           const element = findSendAnchor(callId);
@@ -478,15 +520,42 @@ window.__ModuleLoader__.load({
             revealSendAnchor(element, callId);
             return;
           }
-          if (attempts < 140) {
+          // Fast path: the block is usually inside the window Chat opens first.
+          if (attempts <= 10) {
             try {
               window.setTimeout(tick, 150);
             } catch (_) {
               /* timer unavailable: the session still opens */
             }
-          } else {
-            showJumpNotice('跨会话跳转：未找到发送位置（可能不在当前已加载的历史窗口内）');
+            return;
           }
+          // Slow path: ask Chat itself to prepend older history pages.
+          const scroller = findConversationScroller();
+          const control = scroller === null ? null : findLoadOlderControl(scroller);
+          if (control !== null) {
+            if (control.disabled === true) {
+              stalled = 0;
+            } else {
+              try {
+                control.click();
+                pages += 1;
+                stalled = 0;
+              } catch (_) {
+                stalled += 1;
+              }
+            }
+          } else {
+            stalled += 1;
+          }
+          if (pages < 80 && stalled < 4) {
+            try {
+              window.setTimeout(tick, 500);
+            } catch (_) {
+              /* timer unavailable: the session still opens */
+            }
+            return;
+          }
+          showJumpNotice('跨会话跳转：已加载较早历史，但未找到发送位置');
         }
         try {
           window.setTimeout(tick, 120);

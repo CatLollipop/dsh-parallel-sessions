@@ -479,3 +479,68 @@ test('the sender side renders a sent block with recipient and content only', asy
   });
   assert.match(textsOf(failed), /跨会话消息发送失败/);
 });
+
+test('the jump pages older history via the load-earlier control until the block appears', async () => {
+  // Fresh, purpose-built DOM: the target anchor is not in the loaded window
+  // until the "load earlier" control has been activated twice.
+  const scrolled = [];
+  const anchor = {
+    scrollIntoView(options) { scrolled.push(options); },
+    getAttribute() { return null; },
+    setAttribute() {},
+    removeAttribute() {},
+    animate() {},
+    parentElement: null,
+    querySelector() { return null; },
+  };
+  let loads = 0;
+  const loadButton = {
+    textContent: '加载更早',
+    disabled: false,
+    click() {
+      loads += 1;
+    },
+  };
+  const scroller = {
+    getBoundingClientRect() { return { width: 900, height: 600, top: 0, bottom: 600, left: 0, right: 900 }; },
+    querySelectorAll() { return [loadButton]; },
+    querySelector() { return null; },
+    scrollHeight: 5000,
+    scrollTop: 0,
+  };
+  globalThis.document = {
+    head: { appendChild() {} },
+    body: { appendChild() {} },
+    createElement() {
+      return { style: {}, textContent: '', setAttribute() {}, appendChild() {}, remove() {} };
+    },
+    querySelector(selector) {
+      return String(selector).indexOf('data-parallel-call-id') !== -1 && loads >= 2 ? anchor : null;
+    },
+    querySelectorAll(selector) {
+      if (String(selector).indexOf('data-conversation-scroll') !== -1) return [scroller];
+      return [];
+    },
+    execCommand() { return true; },
+  };
+  globalThis.window = {
+    innerHeight: 900,
+    setTimeout(callback) { callback(); return 0; },
+    __ModuleLoader__: { load() {} },
+  };
+
+  const client = await loadClient();
+  const host = createHost();
+  client.apply(host.ctx);
+  const definition = host.state.definitions[0];
+  const node = definition.buildViewNode(contextOf(definition, relayEvent(), { previous: () => undefined }));
+  const component = host.state.renderers.find((renderer) => renderer.options.key === 'parallel-session-card').component;
+  const view = component({ node });
+  const sender = findElement(view, (element) => element.props && element.props.className === 'ps-card-sender');
+  sender.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(host.state.opened, ['session-sender']);
+  assert.equal(loads, 2, 'load-earlier should be activated until the anchor exists');
+  assert.equal(scrolled.length, 1, 'the found block should then be scrolled into view and highlighted');
+});
