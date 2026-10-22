@@ -130,7 +130,8 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
 - 端到端演示：从临时会话向当前会话投递 `intent:info` 消息（默认 steer 直接送达），接收方气泡底部显示「来自会话「…」· 信息同步 · 时间 · 复制」；发送方会话内对应显示“发给会话「…」+ 正文 + 已送达”的发送块。临时会话已归档。
 - v0.3 在线验证：在线页面中接收方气泡 `parallel-session-card` 与发送方发送块 `parallel_message`（`tool.call.toolview`）两个渲染器均为 active；用临时会话做了双向演示：接收方会话的对话流出现仅含正文的气泡，发送方会话的 `parallel_message` 工具卡片被替换为“发给会话「…」+ 正文 + 已送达”的发送块；临时会话已归档。
 - 视觉渲染：已用真实运行界面截图验证并保存到 `docs/screenshots/`（见上方「界面截图」章节）；截图取自本机 GUI，接收气泡靠右、发送块靠左。
-- 关键修复：Client 半区此前未在 `inject` 中声明 `uiConversation`，导致自定义 Conversation Definition 未注册、消息回退为内置渲染（头部信息外露）。本版已补上 `uiConversation` / `uiWorkspace` 注入。
+- 关键修复 1（v0.3.0）：Client 半区此前未在 `inject` 中声明 `uiConversation`，导致自定义 Conversation Definition 未注册、消息回退为内置渲染（头部信息外露）。已补上 `uiConversation` / `uiWorkspace` 注入。
+- 关键修复 2（v0.3.3）：冷启动时 Chat 节点槽位回调可能晚于 client apply 执行，原先用该回调的同步结果决定是否注册消息 Definition，导致重启后气泡不出现；现改为独立注册 Definition，并加了回归测试（27 个用例）。
 
 ## 仓库
 
