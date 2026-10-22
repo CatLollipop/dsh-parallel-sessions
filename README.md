@@ -49,6 +49,18 @@
 - 插件自带的 Client 半区把跨会话消息渲染为**对话流内的聊天气泡**（`conversation.chat.node` 自定义节点，复用宿主用户气泡的圆角/配色/字号 token），我发出的发送块靠左、我收到的接收气泡靠右。气泡内只显示消息正文（`source.display` 投影，模型可见的协调头部不会进入 UI）。底部一行依次是：**来自会话「标题」（点击打开发送方会话，并滚动/高亮到那次发送消息的工具调用位置）· 状态（是否继续：如“已暂停 · 等待继续”/“已恢复 · 可以继续”）· 时间 · 复制按钮**。发送方一侧通过 `tool.call.toolview` 把 `parallel_message` 的工具卡片替换为“发给会话「标题」+ 正文 + 状态”的独立发送块，不显示 messageId 等技术字段。
 - 正文首行同样由 Host 写入发送方标题与 `ps_` 别名，模型不依赖 UI 也能知道“是谁发来的、该用哪个别名回信”。
 
+## 界面截图（实际运行效果）
+
+以下截图来自本机运行中的 DeepSeek Harness（v0.3.3，2026-10-23）。
+
+**方向约定：我发出的发送块在左，我收到的接收气泡在右；气泡底部显示归属会话、是否继续状态、时间与复制按钮。**
+
+![发送块在左、接收气泡在右](docs/screenshots/chat-direction.png)
+
+![发送方发送块（左侧）](docs/screenshots/sender-block.png)
+
+![接收方气泡（右侧）](docs/screenshots/receiver-bubble.png)
+
 ## 安装
 
 把本目录作为本地 bundle 安装进当前 profile：
@@ -117,7 +129,7 @@ node --check lib/index.js && node --check lib/core.js && node --check client.js
   - 目标会话用 `parallel_message` 回信发起方，双向沟通与归属显示均正常。
 - 端到端演示：从临时会话向当前会话投递 `intent:info` 消息（默认 steer 直接送达），接收方气泡底部显示「来自会话「…」· 信息同步 · 时间 · 复制」；发送方会话内对应显示“发给会话「…」+ 正文 + 已送达”的发送块。临时会话已归档。
 - v0.3 在线验证：在线页面中接收方气泡 `parallel-session-card` 与发送方发送块 `parallel_message`（`tool.call.toolview`）两个渲染器均为 active；用临时会话做了双向演示：接收方会话的对话流出现仅含正文的气泡，发送方会话的 `parallel_message` 工具卡片被替换为“发给会话「…」+ 正文 + 已送达”的发送块；临时会话已归档。
-- 视觉渲染：无浏览器控制，未做截图级验证，实际观感请在对话流中查看。若样式未更新，刷新一次页面。
+- 视觉渲染：已用真实运行界面截图验证并保存到 `docs/screenshots/`（见上方「界面截图」章节）；截图取自本机 GUI，接收气泡靠右、发送块靠左。
 - 关键修复：Client 半区此前未在 `inject` 中声明 `uiConversation`，导致自定义 Conversation Definition 未注册、消息回退为内置渲染（头部信息外露）。本版已补上 `uiConversation` / `uiWorkspace` 注入。
 
 ## 仓库
