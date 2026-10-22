@@ -75,7 +75,7 @@ async function loadClient() {
 }
 
 function createHost() {
-  const state = { renderers: [], definitions: [], touchedInjectKeys: [], opened: [] };
+  const state = { renderers: [], definitions: [], touchedInjectKeys: [], opened: [], unarchived: [] };
   const host = {
     ctx: {
       effect(callback) {
@@ -118,6 +118,12 @@ function createHost() {
       uiWorkspace: {
         openSession(sessionId) {
           state.opened.push(sessionId);
+        },
+      },
+      workspaces: {
+        unarchiveSession(sessionId) {
+          state.unarchived.push(sessionId);
+          return Promise.resolve();
         },
       },
     },
@@ -378,6 +384,29 @@ test('hold and release messages show whether the session continues', async () =>
     const text = textsOf(component({ node }));
     assert.match(text, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+});
+
+test('clicking an archived sender unarchives it before opening the session', async () => {
+  installDom();
+  const client = await loadClient();
+  const host = createHost();
+  client.apply(host.ctx);
+  const definition = host.state.definitions[0];
+  const node = definition.buildViewNode(contextOf(definition, relayEvent(), { previous: () => undefined }));
+  const component = host.state.renderers.find((renderer) => renderer.options.key === 'parallel-session-card').component;
+  const view = component({
+    node,
+    useWorkspaces(selector) {
+      return selector({ archivedSessionIds: ['session-sender'], pinnedSessionIds: [] });
+    },
+  });
+  const sender = findElement(view, (element) => element.props && element.props.className === 'ps-card-sender');
+  assert.ok(sender);
+  assert.match(String(sender.props.title), /已归档/);
+  sender.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(host.state.unarchived, ['session-sender']);
+  assert.deepEqual(host.state.opened, ['session-sender']);
 });
 
 test('the sender side renders a sent block with recipient and content only', async () => {

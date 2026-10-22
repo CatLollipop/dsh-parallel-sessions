@@ -7,7 +7,7 @@ window.__ModuleLoader__.load({
     const React = require('react');
 
     const name = 'dsh-parallel-sessions-client';
-    const inject = ['slots', 'locale', 'uiConversation', 'uiWorkspace'];
+    const inject = ['slots', 'locale', 'uiConversation', 'uiWorkspace', 'workspaces'];
     const NS = 'parallel-sessions';
     const PRODUCER = 'parallel-sessions';
     /** Renderer key contributed to the Chat node slot (never a shipped key). */
@@ -19,6 +19,7 @@ window.__ModuleLoader__.load({
       'card.from': '来自会话「{title}」',
       'card.unknown': '未知会话',
       'card.open': '打开发送方会话',
+      'card.openArchived': '发送方会话已归档，点击会取消归档并打开',
       'card.intent.info': '信息同步',
       'card.intent.guide': '设计方向指导',
       'card.intent.handoff': '阶段交接',
@@ -38,6 +39,7 @@ window.__ModuleLoader__.load({
       'card.from': 'From session “{title}”',
       'card.unknown': 'Unknown session',
       'card.open': 'Open sender session',
+      'card.openArchived': 'Sender session is archived; click to unarchive and open it',
       'card.intent.info': 'Info',
       'card.intent.guide': 'Design guidance',
       'card.intent.handoff': 'Handoff',
@@ -328,6 +330,29 @@ window.__ModuleLoader__.load({
         return false;
       }
 
+      /** Open a sender session; an archived one is restored first. */
+      function openSenderSession(sessionId, callId, archived) {
+        if (!archived) {
+          jumpToSenderMessage(sessionId, callId);
+          return;
+        }
+        let task;
+        try {
+          const service = ctx.workspaces;
+          if (service !== undefined && service !== null && typeof service.unarchiveSession === 'function') {
+            task = service.unarchiveSession(sessionId);
+          }
+        } catch (_) {
+          task = undefined;
+        }
+        if (task !== undefined && task !== null && typeof task.then === 'function') {
+          task.then(function () { jumpToSenderMessage(sessionId, callId); },
+            function () { jumpToSenderMessage(sessionId, callId); });
+          return;
+        }
+        jumpToSenderMessage(sessionId, callId);
+      }
+
       /** Open the sender session and scroll to the exact send action. */
       function jumpToSenderMessage(sessionId, callId) {
         if (typeof sessionId === 'string' && sessionId !== '') openSession(sessionId);
@@ -423,10 +448,20 @@ window.__ModuleLoader__.load({
         const data = (props.node && props.node.data) || {};
         const [copied, setCopied] = React.useState(false);
         const timer = React.useRef(null);
+        const useWorkspaces = typeof props.useWorkspaces === 'function'
+          ? props.useWorkspaces
+          : function () { return false; };
 
         React.useEffect(() => () => {
           if (timer.current !== null) clearTimeout(timer.current);
         }, []);
+
+        const senderArchived = useWorkspaces(function (workspaceSnapshot) {
+          if (!workspaceSnapshot || !Array.isArray(workspaceSnapshot.archivedSessionIds)) return false;
+          const senderId = data.senderSessionId;
+          if (typeof senderId !== 'string' || senderId === '') return false;
+          return workspaceSnapshot.archivedSessionIds.indexOf(senderId) !== -1;
+        }) === true;
 
         if (typeof data.intent !== 'string') return null;
 
@@ -444,6 +479,9 @@ window.__ModuleLoader__.load({
             : (typeof data.summary === 'string' ? data.summary : ''));
         const canOpen = typeof data.senderSessionId === 'string' && data.senderSessionId !== '';
         const time = clockText(data.time, snapshot);
+        const openHint = senderArchived
+          ? text(snapshot, 'card.openArchived', {}, '发送方会话已归档，点击会取消归档并打开', 'Sender session is archived; click to unarchive and open it')
+          : text(snapshot, 'card.open', {}, '打开发送方会话', 'Open sender session');
 
         function onCopy() {
           const value = body !== '' ? body : from;
@@ -473,9 +511,9 @@ window.__ModuleLoader__.load({
                 type: 'button',
                 className: 'ps-card-sender',
                 disabled: !canOpen,
-                title: from + (canOpen ? ' · ' + text(snapshot, 'card.open', {}, '打开发送方会话', 'Open sender session') : '') + (data.alias !== '' ? ' · ' + data.alias : ''),
+                title: from + (canOpen ? ' · ' + openHint : '') + (data.alias !== '' ? ' · ' + data.alias : ''),
                 'aria-label': from,
-                onClick: function () { if (canOpen) jumpToSenderMessage(data.senderSessionId, data.senderCallId); },
+                onClick: function () { if (canOpen) openSenderSession(data.senderSessionId, data.senderCallId, senderArchived); },
               }, from),
               React.createElement('span', {
                 className: 'ps-card-status',
