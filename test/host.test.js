@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { apply } from '../lib/index.js';
-import { makeSessionAlias } from '../lib/core.js';
+import { makeLegacyAlias, makeSessionAlias } from '../lib/core.js';
 
 /** One deliverable live Agent stand-in with the runtime primitives the plugin probes. */
 class FakeAgent {
@@ -268,6 +268,22 @@ test('parallel_message delivers directly to an idle target by default (no queue)
 
   assert.equal(value.accepted, true);
   assert.equal(value.mode, 'steer', 'default is immediate steer delivery, not followup queueing');
+  assert.deepEqual(peer.calls.map((call) => call.mode), ['steer']);
+});
+
+test('legacy ps_ aliases still resolve for this plugin only', async () => {
+  const caller = new FakeAgent('session-caller', { status: 'running' });
+  const peer = new FakeAgent('session-peer', { status: 'idle' });
+  const host = createHost({
+    live: [caller, peer],
+    titles: { 'session-caller': '接口组', 'session-peer': '设计评审' },
+  });
+
+  const value = await host.execute('parallel_message', {
+    session_id: makeLegacyAlias('session-peer'),
+    message: '旧别名兼容',
+  }, 'session-caller');
+  assert.equal(value.accepted, true);
   assert.deepEqual(peer.calls.map((call) => call.mode), ['steer']);
 });
 

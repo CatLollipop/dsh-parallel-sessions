@@ -10,6 +10,7 @@ import {
   intentLabel,
   isMaskedPlaceholderId,
   isSessionAlias,
+  makeLegacyAlias,
   makeSessionAlias,
   normalizeCwd,
   summarize,
@@ -19,9 +20,17 @@ test('session aliases are deterministic, distinct, and display-safe', () => {
   const first = makeSessionAlias('session-a4435ee0-6d1d-4a26-b471-ab45a515f789');
   const second = makeSessionAlias('session-a4435ee0-6d1d-4a26-b471-ab45a515f789');
   assert.equal(first, second);
-  assert.match(first, /^ps_[0-9A-Za-z]{10}$/);
+  assert.match(first, /^cs_[0-9A-Za-z]{10}$/);
   assert.ok(isSessionAlias(first));
   assert.notEqual(first, makeSessionAlias('session-ffffffff-6d1d-4a26-b471-ab45a515f789'));
+  // Must stay byte-identical with dsh-cross-session-approval so one alias works
+  // for both tool families (reference taken from the live cross_session_list).
+  assert.equal(first, 'cs_IgeMbLi2ku');
+  const legacy = makeLegacyAlias('session-a4435ee0-6d1d-4a26-b471-ab45a515f789');
+  assert.match(legacy, /^ps_[0-9A-Za-z]{10}$/);
+  assert.notEqual(legacy, first);
+  assert.equal(isSessionAlias(first), true);
+  assert.equal(isSessionAlias(legacy), true);
 });
 
 test('masked placeholder ids are rejected while ordinary ids pass', () => {
@@ -55,7 +64,7 @@ test('relay source carries sender attribution fields the Chat relay renderer rea
   const source = buildRelaySource({
     senderSessionId: 'session-a',
     senderTitle: '设计评审',
-    senderAlias: 'ps_abcdefghij',
+    senderAlias: 'cs_abcdefghij',
     targetSessionId: 'session-b',
     intent: 'guide',
     summary: '接口调整',
@@ -75,12 +84,12 @@ test('relay source carries sender attribution fields the Chat relay renderer rea
 test('peer message text names the sender and the reply alias', () => {
   const text = formatPeerMessageText({
     senderTitle: '设计评审',
-    senderAlias: 'ps_abcdefghij',
+    senderAlias: 'cs_abcdefghij',
     senderSessionId: 'session-a',
     intent: 'guide',
     message: '请把返回结构改成 Result 包装',
   });
-  assert.match(text, /来自「设计评审」 ps_abcdefghij/);
+  assert.match(text, /来自「设计评审」 cs_abcdefghij/);
   assert.match(text, /guide/);
   assert.match(text, /parallel_message/);
   assert.match(text, /Result 包装/);
@@ -89,7 +98,7 @@ test('peer message text names the sender and the reply alias', () => {
 test('hold and release notices carry holder attribution and next action', () => {
   const hold = formatHoldText({
     holderTitle: '接口重构',
-    holderAlias: 'ps_holder0000',
+    holderAlias: 'cs_holder0000',
     reason: '重构登录接口',
     impact: '联调阶段',
     clearedQueue: 2,
@@ -101,7 +110,7 @@ test('hold and release notices carry holder attribution and next action', () => 
   assert.match(hold, /自动恢复/);
   const release = formatReleaseText({
     holderTitle: '接口重构',
-    holderAlias: 'ps_holder0000',
+    holderAlias: 'cs_holder0000',
     reason: '重构登录接口',
     note: '返回结构已改为 Result',
     auto: true,

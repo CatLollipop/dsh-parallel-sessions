@@ -145,9 +145,9 @@ function relayEvent(overrides = {}) {
       content: [{
         type: 'text',
         text: [
-          '【跨会话消息 · 来自「设计评审」 ps_abcdefghij】',
+          '【跨会话消息 · 来自「设计评审」 cs_abcdefghij】',
           '意图：guide（设计方向指导）',
-          '回信请用 parallel_message，session_id = ps_abcdefghij（接收方 UI 另行显示完整发起会话）。',
+          '回信请用 parallel_message，session_id = cs_abcdefghij（接收方 UI 另行显示完整发起会话）。',
           '',
           '请把新模块的返回结构统一为 Result 包装。',
         ].join('\n'),
@@ -158,7 +158,7 @@ function relayEvent(overrides = {}) {
         producer: 'parallel-sessions',
         senderSessionId: 'session-sender',
         senderTitle: '设计评审',
-        senderAlias: 'ps_abcdefghij',
+        senderAlias: 'cs_abcdefghij',
         targetSessionId: 'session-target',
         intent: 'guide',
         summary: '请把新模块的返回结构统一为 Result 包装。',
@@ -314,7 +314,7 @@ test('the view node is a bubble-like context card that keeps sender attribution'
   assert.equal(node.groupTree, undefined);
   assert.equal(node.data.title, '设计评审');
   assert.equal(node.data.intent, 'guide');
-  assert.equal(node.data.alias, 'ps_abcdefghij');
+  assert.equal(node.data.alias, 'cs_abcdefghij');
   assert.equal(node.data.body, '请把新模块的返回结构统一为 Result 包装。');
   assert.equal(node.data.display, '请把新模块的返回结构统一为 Result 包装。');
   assert.equal(node.data.senderCallId, 'call-sender-1');
@@ -456,7 +456,7 @@ test('the sender side renders a sent block with recipient and content only', asy
       meta: {
         acquired: true,
         targetTitle: '设计评审',
-        targetAlias: 'ps_abcdefghij',
+        targetAlias: 'cs_abcdefghij',
         intent: '信息同步',
         mode: 'steer',
         message: '请把新模块的返回结构统一为 Result 包装。',
