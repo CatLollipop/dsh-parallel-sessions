@@ -177,7 +177,7 @@ function turnEvent(type, data) {
   return { type, seq: 1, time: Date.now(), data };
 }
 
-test('parallel_sessions lists live and cold sessions in the same workspace with aliases', async () => {
+test('parallel_sessions hides offline sessions by default and lists them read-only on request', async () => {
   const caller = new FakeAgent('session-caller', { status: 'running', cwd: '/workspace' });
   const peer = new FakeAgent('session-peer', { status: 'idle', cwd: '/workspace' });
   const cold = new FakeAgent('session-cold', { status: 'offline', cwd: '/workspace' });
@@ -206,12 +206,18 @@ test('parallel_sessions lists live and cold sessions in the same workspace with 
   const value = await host.execute('parallel_sessions', {}, 'session-caller');
   assert.equal(value.parallel, true);
   const ids = value.sessions.map((row) => row.sessionId).sort();
-  assert.deepEqual(ids, ['session-caller', 'session-cold', 'session-peer']);
+  assert.deepEqual(ids, ['session-caller', 'session-peer']);
   const peerRow = value.sessions.find((row) => row.sessionId === 'session-peer');
   assert.equal(peerRow.title, '设计评审');
   assert.equal(peerRow.alias, makeSessionAlias('session-peer'));
   assert.equal(peerRow.status, 'idle');
   assert.equal(value.self.alias, makeSessionAlias('session-caller'));
+
+  const withOffline = await host.execute('parallel_sessions', { include_offline: true }, 'session-caller');
+  const allIds = withOffline.sessions.map((row) => row.sessionId).sort();
+  assert.deepEqual(allIds, ['session-caller', 'session-cold', 'session-peer']);
+  const coldRow = withOffline.sessions.find((row) => row.sessionId === 'session-cold');
+  assert.equal(coldRow.status, 'offline');
 });
 
 test('parallel_message delivers an attributed relay card and steers a running target', async () => {
@@ -304,7 +310,7 @@ test('parallel_message refuses self-targets, masked placeholders, and unknown al
   );
 });
 
-test('parallel_message cold-delivers by resuming the target session', async () => {
+test('parallel_message refuses to wake an offline target', async () => {
   const caller = new FakeAgent('session-caller', { status: 'running' });
   const coldHeader = {
     version: 1,
@@ -319,19 +325,15 @@ test('parallel_message cold-delivers by resuming the target session', async () =
     titles: { 'session-caller': '主会话', 'session-cold': '旧任务' },
   });
 
-  const value = await host.execute('parallel_message', {
-    session_id: makeSessionAlias('session-cold'),
-    message: '继续之前的任务',
-  }, 'session-caller');
-
-  assert.equal(value.accepted, true);
-  assert.equal(value.resumed, true);
-  assert.equal(value.mode, 'steer');
-  const resumed = host.live.get('session-cold');
-  assert.ok(resumed);
-  assert.equal(resumed.delivered.length, 1);
-  assert.equal(resumed.delivered[0].source.intent, 'info');
-  assert.equal(resumed.delivered[0].source.display, '继续之前的任务');
+  await assert.rejects(
+    host.execute('parallel_message', {
+      session_id: makeSessionAlias('session-cold'),
+      message: '继续之前的任务',
+    }, 'session-caller'),
+    /未活动|不创建|不唤醒/,
+  );
+  assert.equal(host.live.has('session-cold'), false, 'offline target must not be resumed');
+  assert.equal(caller.delivered.length, 0);
 });
 
 test('parallel_hold stops the target turn and auto-releases on the holder turn end', async () => {
